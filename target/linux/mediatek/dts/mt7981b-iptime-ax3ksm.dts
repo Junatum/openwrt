@@ -1,0 +1,154 @@
+// SPDX-License-Identifier: (GPL-2.0 OR MIT)
+
+/dts-v1/;
+
+#include <dt-bindings/leds/common.h>
+
+#include "mt7981.dtsi"
+
+/ {
+	model = "ipTIME AX3000SM";
+	compatible = "iptime,ax3ksm", "mediatek,mt7981-spim-snand-rfb";
+	
+	// aliases {
+	//      serial0 = &uart0;
+	//      led-boot = &led_status;
+	//      led-failsafe = &led_status;
+	//      led-running = &led_status;
+	//      led-upgrade = &led_status;
+	// };
+	
+	chosen {
+		bootargs-override = "console=ttyS0,115200n8 loglevel=8 earlycon=uart8250,mmio32,0x11002000";
+		// stdout-path = "serial0:115200n8";
+	};
+	
+	// gpio-keys {
+	//      compatible = "gpio-keys";
+	
+	//      reset {
+	//              label = "reset";
+	//              gpios = <&pio 1 GPIO_ACTIVE_LOW>;
+	//              linux,code = <KEY_RESTART>;
+	//      };
+	
+	//      wps {
+	//              label = "wps";
+	//              gpios = <&pio 0 GPIO_ACTIVE_LOW>;
+	//              linux,code = <KEY_WPS_BUTTON>;
+	//      };
+	// };
+	
+	// leds {
+	//      compatible = "gpio-leds";
+	
+	//      led_status: internet-white {
+	//              function = LED_FUNCTION_WAN_ONLINE;
+	//              color = <LED_COLOR_ID_WHITE>;
+	//              gpios = <&pio 10 GPIO_ACTIVE_LOW>;
+	//      };
+	
+	//      internet-red {
+	//              function = LED_FUNCTION_WAN_ONLINE;
+	//              color = <LED_COLOR_ID_RED>;
+	//              gpios = <&pio 4 GPIO_ACTIVE_LOW>;
+	//      };
+	
+	//      wan {
+	//              function = LED_FUNCTION_WAN;
+	//              color = <LED_COLOR_ID_GREEN>;
+	//              gpios = <&pio 5 GPIO_ACTIVE_LOW>;
+	//      };
+	
+	//      lan {
+	//              function = LED_FUNCTION_LAN;
+	//              color = <LED_COLOR_ID_GREEN>;
+	//              gpios = <&pio 9 GPIO_ACTIVE_LOW>;
+	//      };
+	// };
+};
+
+&spi0 {
+	status = "okay";
+	pinctrl-names = "default";
+	// pinctrl-0 = <&spi0_flash_pins>;
+	
+	spi_nand: spi_nand@0 {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		compatible = "spi-nand";
+		reg = <0>;
+		spi-max-frequency = <90000000>;
+		
+		// spi-cal-enable;
+		// spi-cal-mode = "read-data";
+		// spi-cal-datalen = <7>;
+		// spi-cal-data = /bits/ 8 <0x53 0x50 0x49 0x4E 0x41 0x4E 0x44>;
+		// spi-cal-addrlen = <5>;
+		// spi-cal-addr = /bits/ 32 <0x0 0x0 0x0 0x0 0x0>;
+		
+		spi-tx-bus-width = <4>;
+		spi-rx-bus-width = <4>;
+		mediatek,nmbm;
+		mediatek,bmt-max-ratio = <1>;
+		mediatek,bmt-max-reserved-blocks = <64>;
+		
+		partitions {
+			compatible = "fixed-partitions";
+			#address-cells = <1>;
+			#size-cells = <1>;
+			
+			partition@0 {
+				label = "BL2";
+				reg = <0x00000 0x0100000>;
+				read-only;
+			};
+			
+			partition@100000 {
+				label = "u-boot-env";
+				reg = <0x0100000 0x080000>;
+				read-only;
+			};
+			
+			factory: partition@180000 {
+				label = "Factory";
+				reg = <0x180000 0x0200000>;
+				read-only;
+			};
+			
+			partition@380000 {
+				label = "FIP";
+				reg = <0x380000 0x0200000>;
+				read-only;
+			};
+			
+			partition@580000 {
+				label = "ubi";
+				reg = <0x580000 0x06E00000>;
+			};
+		};
+	};
+};
+
+// &pio {
+//      spi0_flash_pins: spi0-pins {
+//              mux {
+//                      function = "spi";
+//                      groups = "spi0", "spi0_wp_hold";
+//              };
+//      };
+// };
+
+&uart0 {
+	status = "okay";
+};
+
+&watchdog {
+	status = "okay";
+};
+
+// &wifi {
+//      status = "okay";
+
+//      mediatek,mtd-eeprom = <&factory 0x0>;
+// };
