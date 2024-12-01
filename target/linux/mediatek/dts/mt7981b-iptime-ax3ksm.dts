@@ -2,93 +2,59 @@
 
 /dts-v1/;
 
-#include <dt-bindings/leds/common.h>
-
 #include "mt7981.dtsi"
 
 / {
 	model = "ipTIME AX3000SM";
 	compatible = "iptime,ax3ksm", "mediatek,mt7981-spim-snand-rfb";
 	
-	// aliases {
-	//      serial0 = &uart0;
-	//      led-boot = &led_status;
-	//      led-failsafe = &led_status;
-	//      led-running = &led_status;
-	//      led-upgrade = &led_status;
-	// };
+	aliases {
+		serial0 = &uart0;
+	};
 	
 	chosen {
 		bootargs-override = "console=ttyS0,115200n8 loglevel=8 earlycon=uart8250,mmio32,0x11002000";
-		// stdout-path = "serial0:115200n8";
+		stdout-path = "serial0:115200n8";
 	};
 	
-	// gpio-keys {
-	//      compatible = "gpio-keys";
-	
-	//      reset {
-	//              label = "reset";
-	//              gpios = <&pio 1 GPIO_ACTIVE_LOW>;
-	//              linux,code = <KEY_RESTART>;
-	//      };
-	
-	//      wps {
-	//              label = "wps";
-	//              gpios = <&pio 0 GPIO_ACTIVE_LOW>;
-	//              linux,code = <KEY_WPS_BUTTON>;
-	//      };
-	// };
-	
-	// leds {
-	//      compatible = "gpio-leds";
-	
-	//      led_status: internet-white {
-	//              function = LED_FUNCTION_WAN_ONLINE;
-	//              color = <LED_COLOR_ID_WHITE>;
-	//              gpios = <&pio 10 GPIO_ACTIVE_LOW>;
-	//      };
-	
-	//      internet-red {
-	//              function = LED_FUNCTION_WAN_ONLINE;
-	//              color = <LED_COLOR_ID_RED>;
-	//              gpios = <&pio 4 GPIO_ACTIVE_LOW>;
-	//      };
-	
-	//      wan {
-	//              function = LED_FUNCTION_WAN;
-	//              color = <LED_COLOR_ID_GREEN>;
-	//              gpios = <&pio 5 GPIO_ACTIVE_LOW>;
-	//      };
-	
-	//      lan {
-	//              function = LED_FUNCTION_LAN;
-	//              color = <LED_COLOR_ID_GREEN>;
-	//              gpios = <&pio 9 GPIO_ACTIVE_LOW>;
-	//      };
-	// };
+	gpio-keys {
+		compatible = "gpio-keys";
+		
+		reset {
+			label = "reset";
+			gpios = <&pio 1 GPIO_ACTIVE_LOW>;
+			linux,code = <KEY_RESTART>;
+		};
+		
+		wps {
+			label = "wps";
+			gpios = <&pio 0 GPIO_ACTIVE_LOW>;
+			linux,code = <KEY_WPS_BUTTON>;
+		};
+	};
 };
 
 &spi0 {
 	status = "okay";
 	pinctrl-names = "default";
-	// pinctrl-0 = <&spi0_flash_pins>;
+	pinctrl-0 = <&spi0_flash_pins>;
 	
 	spi_nand: spi_nand@0 {
 		#address-cells = <1>;
 		#size-cells = <1>;
 		compatible = "spi-nand";
 		reg = <0>;
-		spi-max-frequency = <90000000>;
 		
-		// spi-cal-enable;
-		// spi-cal-mode = "read-data";
-		// spi-cal-datalen = <7>;
-		// spi-cal-data = /bits/ 8 <0x53 0x50 0x49 0x4E 0x41 0x4E 0x44>;
-		// spi-cal-addrlen = <5>;
-		// spi-cal-addr = /bits/ 32 <0x0 0x0 0x0 0x0 0x0>;
-		
+		spi-max-frequency = <100000000>;
 		spi-tx-bus-width = <4>;
 		spi-rx-bus-width = <4>;
+		spi-cal-enable;
+		spi-cal-mode = "read-data";
+		spi-cal-datalen = <7>;
+		spi-cal-data = /bits/ 8 <0x53 0x50 0x49 0x4E 0x41 0x4E 0x44>;
+		spi-cal-addrlen = <5>;
+		spi-cal-addr = /bits/ 32 <0x0 0x0 0x0 0x0 0x0>;
+		
 		mediatek,nmbm;
 		mediatek,bmt-max-ratio = <1>;
 		mediatek,bmt-max-reserved-blocks = <64>;
@@ -114,6 +80,18 @@
 				label = "Factory";
 				reg = <0x180000 0x0200000>;
 				read-only;
+				
+				nvmem-layout {
+					compatible = "fixed-layout";
+					#address-cells = <1>;
+					#size-cells = <1>;
+					
+					macaddr_factory_4: macaddr@04 {
+						compatible = "mac-base";
+						#nvmem-cell-cells = <1>;
+						reg = <0x4 0x6>;
+					};
+				};
 			};
 			
 			partition@380000 {
@@ -130,14 +108,14 @@
 	};
 };
 
-// &pio {
-//      spi0_flash_pins: spi0-pins {
-//              mux {
-//                      function = "spi";
-//                      groups = "spi0", "spi0_wp_hold";
-//              };
-//      };
-// };
+&pio {
+	spi0_flash_pins: spi0-pins {
+		mux {
+			function = "spi";
+			groups = "spi0", "spi0_wp_hold";
+		};
+	};
+};
 
 &uart0 {
 	status = "okay";
@@ -147,8 +125,98 @@
 	status = "okay";
 };
 
-// &wifi {
-//      status = "okay";
+&usb_phy {
+	status = "okay";
+};
 
-//      mediatek,mtd-eeprom = <&factory 0x0>;
-// };
+&xhci {
+	status = "okay";
+};
+
+&mdio_bus {
+	#address-cells = <1>;
+	#size-cells = <0>;
+	
+	switch@1f {
+		compatible = "mediatek,mt7531";
+		reg = <31>;
+		reset-gpios = <&pio 39 GPIO_ACTIVE_HIGH>;
+		interrupt-controller;
+		#interrupt-cells = <1>;
+		interrupt-parent = <&pio>;
+		interrupts = <38 IRQ_TYPE_LEVEL_HIGH>;
+		
+		ports {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			
+			port@0 {
+				reg = <0>;
+				label = "lan0";
+			};
+			
+			port@1 {
+				reg = <1>;
+				label = "lan1";
+			};
+			
+			port@2 {
+				reg = <2>;
+				label = "lan2";
+			};
+			
+			port@3 {
+				reg = <3>;
+				label = "lan3";
+			};
+			
+			// port@4 {
+			// 	reg = <4>;
+			// 	label = "wan";
+			
+			// 	nvmem-cell-names = "mac-address";
+			// 	nvmem-cells = <&macaddr_factory_4 1>;
+			// };
+			
+			port@6 {
+				reg = <6>;
+				label = "cpu";
+				ethernet = <&gmac0>;
+				phy-mode = "2500base-x";
+				
+				fixed-link {
+					speed = <2500>;
+					full-duplex;
+					pause;
+				};
+			};
+		};
+	};
+};
+
+&eth {
+	status = "okay";
+	
+	pinctrl-names = "default";
+	pinctrl-0 = <&mdio_pins>;
+	
+	gmac0: mac@0 {
+		compatible = "mediatek,eth-mac";
+		reg = <0>;
+		phy-mode = "2500base-x";
+		nvmem-cell-names = "mac-address";
+		nvmem-cells = <&macaddr_factory_4 0>;
+		
+		fixed-link {
+			speed = <2500>;
+			full-duplex;
+			pause;
+		};
+	};
+};
+
+&wifi {
+	status = "okay";
+	
+	mediatek,mtd-eeprom = <&factory 0x0>;
+};

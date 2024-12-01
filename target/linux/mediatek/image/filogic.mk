@@ -520,9 +520,9 @@ define Device/iptime-ax3ksm
   IMAGE_SIZE := 114688k
   IMAGE/sysupgrade.bin := sysupgrade-tar | append-metadata | iptime-crc32 ax3ksm
 
-  # DEVICE_PACKAGES := kmod-usb3 kmod-mt7981-firmware mt7981-wo-firmware
-  # UBINIZE_OPTS := -E 5
-  # KERNEL_IN_UBI := 1
+  DEVICE_PACKAGES := kmod-usb3 kmod-mt7981-firmware mt7981-wo-firmware
+  UBINIZE_OPTS := -E 5
+  KERNEL_IN_UBI := 1
 endef
 TARGET_DEVICES += iptime-ax3ksm
 
