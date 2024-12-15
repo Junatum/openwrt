@@ -140,7 +140,7 @@ mediatek_setup_macs()
 		wan_mac=$label_mac
 		lan_mac=$(macaddr_add "$label_mac" 2)
 		;;
-	iptime,ax3ksm)
+	iptime,ax3000sm)
 		wan_mac=$(mmc_get_mac_binary factory 0x5)
 		lan_mac=$(macaddr_add "$wan_mac" 0x2)
 		label_mac=$wan_mac

@@ -508,7 +508,7 @@ define Device/h3c_magic-nx30-pro
 endef
 TARGET_DEVICES += h3c_magic-nx30-pro
 
-define Device/iptime-ax3ksm
+define Device/iptime_ax3000sm
   UIMAGE_NAME := ax3ksm
   BOARD_NAME := mt7981-AX3000
   DEVICE_VENDOR := ipTIME
@@ -516,15 +516,16 @@ define Device/iptime-ax3ksm
   BLOCKSIZE := 128k
   PAGESIZE := 2048
   DEVICE_DTS_DIR := ../dts
-  DEVICE_DTS := mt7981b-iptime-ax3ksm
+  DEVICE_DTS := mt7981b-iptime-ax3000sm
   IMAGE_SIZE := 114688k
   IMAGE/sysupgrade.bin := sysupgrade-tar | append-metadata | iptime-crc32 ax3ksm
 
+  SUPPORTED_DEVICES += mediatek,mt7981-spim-snand-rfb
   DEVICE_PACKAGES := kmod-usb3 kmod-mt7981-firmware mt7981-wo-firmware
   UBINIZE_OPTS := -E 5
   KERNEL_IN_UBI := 1
 endef
-TARGET_DEVICES += iptime-ax3ksm
+TARGET_DEVICES += iptime_ax3000sm
 
 define Device/jcg_q30-pro
   DEVICE_VENDOR := JCG
