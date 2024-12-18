@@ -47,6 +47,7 @@ mediatek_setup_interfaces()
 		;;
 	cudy,m3000-v1|\
 	cudy,tr3000-v1|\
+	iptime,ax3000sm|\
 	glinet,gl-mt3000)
 		ucidef_set_interfaces_lan_wan eth1 eth0
 		;;
@@ -140,14 +141,14 @@ mediatek_setup_macs()
 		wan_mac=$label_mac
 		lan_mac=$(macaddr_add "$label_mac" 2)
 		;;
-	iptime,ax3000sm)
-		wan_mac=$(mmc_get_mac_binary factory 0x5)
-		lan_mac=$(macaddr_add "$wan_mac" 0x2)
-		label_mac=$wan_mac
-		;;
 	h3c,magic-nx30-pro)
 		wan_mac=$(mtd_get_mac_ascii pdt_data_1 ethaddr)
 		lan_mac=$(macaddr_add "$wan_mac" 1)
+		label_mac=$wan_mac
+		;;
+	iptime,ax3000sm)
+		wan_mac=$(mmc_get_mac_binary factory 0x5)
+		lan_mac=$(macaddr_add "$wan_mac" 0x2)
 		label_mac=$wan_mac
 		;;
 	jdcloud,re-cp-03)
