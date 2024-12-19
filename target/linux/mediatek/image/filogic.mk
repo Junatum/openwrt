@@ -513,17 +513,18 @@ define Device/iptime_ax3000sm
   BOARD_NAME := mt7981-AX3000
   DEVICE_VENDOR := ipTIME
   DEVICE_MODEL := AX3000SM
+  DEVICE_DTS := mt7981b-iptime-ax3000sm
+  DEVICE_DTS_DIR := ../dts
+  UBINIZE_OPTS := -E 5
   BLOCKSIZE := 128k
   PAGESIZE := 2048
-  DEVICE_DTS_DIR := ../dts
-  DEVICE_DTS := mt7981b-iptime-ax3000sm
+  KERNEL_IN_UBI := 1
   IMAGE_SIZE := 114688k
+  IMAGES += factory.bin
+  IMAGE/factory.bin := append-kernel | append-rootfs | iptime-crc32 ax3ksm
   IMAGE/sysupgrade.bin := sysupgrade-tar | append-metadata | iptime-crc32 ax3ksm
-
   SUPPORTED_DEVICES += mediatek,mt7981-spim-snand-rfb
   DEVICE_PACKAGES := kmod-usb3 kmod-mt7981-firmware mt7981-wo-firmware
-  UBINIZE_OPTS := -E 5
-  KERNEL_IN_UBI := 1
 endef
 TARGET_DEVICES += iptime_ax3000sm
 
