@@ -1,7 +1,53 @@
+diff --git a/src/cache.c b/src/cache.c
+index e51f289..aa47bd4 100644
+--- a/src/cache.c
++++ b/src/cache.c
+@@ -956,6 +956,19 @@ int cache_recv_insert(time_t now, int fd)
+   
+   switch (op)
+     {
++#ifdef HAVE_UBUS
++    case PIPE_OP_SAFESHIELD_STATS:
++      {
++	struct safeshield_stats_delta delta;
++
++	if (!read_write(fd, (unsigned char *)&delta, sizeof(delta), RW_READ))
++	  return 0;
++
++	safeshield_stats_apply_delta(&delta.source, delta.queries, delta.blocked);
++	return 1;
++      }
++#endif
++
+     case PIPE_OP_INSERT:
+       {
+ 	/* A marshalled set if cache entries arrives on fd, read, unmarshall and insert into cache of master process. */
 diff --git a/src/dnsmasq.h b/src/dnsmasq.h
+index 5f37c94..2830c80 100644
 --- a/src/dnsmasq.h
 +++ b/src/dnsmasq.h
-@@ -616,6 +616,7 @@ struct server {
+@@ -557,6 +557,7 @@ struct crec {
+ #define PIPE_OP_IPSET   4  /* Update IPset */
+ #define PIPE_OP_NFTSET  5  /* Update NFTset */
+ #define PIPE_OP_KILLED  6  /* child killed by SIGALARM */
++#define PIPE_OP_SAFESHIELD_STATS 7 /* SafeShield TCP statistics delta */
+ 
+ /* struct sockaddr is not large enough to hold any address,
+    and specifically not big enough to hold an IPv6 address.
+@@ -567,6 +568,12 @@ union mysockaddr {
+   struct sockaddr_in6 in6;
+ };
+ 
++struct safeshield_stats_delta {
++  union mysockaddr source;
++  u64 queries;
++  u64 blocked;
++};
++
+ /* bits in flag param to IPv6 callbacks from iface_enumerate() */
+ #define IFACE_TENTATIVE   1
+ #define IFACE_DEPRECATED  2
+@@ -616,6 +623,7 @@ struct server {
    u16 flags, domain_len;
    char *domain;
    struct server *next;
@@ -9,7 +55,7 @@ diff --git a/src/dnsmasq.h b/src/dnsmasq.h
    int serial, arrayposn;
    int last_server;
    union mysockaddr addr, source_addr;
-@@ -632,11 +633,12 @@ struct server {
+@@ -632,11 +640,12 @@ struct server {
  #endif
  };
  
@@ -23,7 +69,7 @@ diff --git a/src/dnsmasq.h b/src/dnsmasq.h
    struct in_addr addr;
  };
  
-@@ -644,6 +646,7 @@ struct serv_addr6 {
+@@ -644,6 +653,7 @@ struct serv_addr6 {
    u16 flags, domain_len;
    char *domain;
    struct server *next;
@@ -31,7 +77,7 @@ diff --git a/src/dnsmasq.h b/src/dnsmasq.h
    struct in6_addr addr;
  };
  
-@@ -651,6 +654,7 @@ struct serv_local {
+@@ -651,6 +661,7 @@ struct serv_local {
    u16 flags, domain_len;
    char *domain;
    struct server *next;
@@ -39,16 +85,17 @@ diff --git a/src/dnsmasq.h b/src/dnsmasq.h
  };
  
  struct rebind_domain {
-@@ -1752,6 +1756,8 @@ typedef void (*ubus_dns_notify_cb)(struct blob_attr *msg, void *priv);
+@@ -1752,6 +1763,9 @@ typedef void (*ubus_dns_notify_cb)(struct blob_attr *msg, void *priv);
  char *ubus_init(void);
  void set_ubus_listeners(void);
  void check_ubus_listeners(void);
 +void safeshield_stats_record_query(const union mysockaddr *source);
 +void safeshield_stats_record_blocked(const union mysockaddr *source);
++void safeshield_stats_apply_delta(const union mysockaddr *source, u64 queries, u64 blocked);
  void drop_ubus_listeners(void);
  int ubus_dns_notify_has_subscribers(void);
  struct blob_buf *ubus_dns_notify_prepare(void);
-@@ -1973,6 +1979,7 @@ void build_server_array(void);
+@@ -1973,6 +1987,7 @@ void build_server_array(void);
  int lookup_domain(char *qdomain, int flags, int *lowout, int *highout);
  int filter_servers(int seed, int flags, int *lowout, int *highout);
  int is_local_answer(time_t now, int first, char *name);
@@ -56,12 +103,13 @@ diff --git a/src/dnsmasq.h b/src/dnsmasq.h
  size_t make_local_answer(int flags, int gotname, size_t size, struct dns_header *header,
  			 char *name, size_t limit, int first, int last, int ede);
  int server_samegroup(struct server *a, struct server *b);
-@@ -1987,3 +1994,4 @@ int add_update_server(int flags,
+@@ -1987,3 +2002,4 @@ int add_update_server(int flags,
  		      const char *interface,
  		      const char *domain,
  		      union all_addr *local_addr); 
 +int add_safeshield_block(const char *domain);
 diff --git a/src/domain-match.c b/src/domain-match.c
+index d3ab6b3..7510a75 100644
 --- a/src/domain-match.c
 +++ b/src/domain-match.c
 @@ -408,6 +408,20 @@ int is_local_answer(time_t now, int first, char *name)
@@ -103,7 +151,7 @@ diff --git a/src/domain-match.c b/src/domain-match.c
    serv->flags = flags;
    serv->domain = alloc_domain;
    serv->domain_len = strlen(alloc_domain);
-@@ -779,3 +795,14 @@ int add_update_server(int flags,
+@@ -779,3 +795,13 @@ int add_update_server(int flags,
    return 1;
  }
  
@@ -117,8 +165,8 @@ diff --git a/src/domain-match.c b/src/domain-match.c
 +
 +  return ret;
 +}
-+
 diff --git a/src/forward.c b/src/forward.c
+index b35298c..8b13f88 100644
 --- a/src/forward.c
 +++ b/src/forward.c
 @@ -344,7 +344,13 @@ static void forward_query(int udpfd, union mysockaddr *udpaddr,
@@ -146,7 +194,33 @@ diff --git a/src/forward.c b/src/forward.c
  #ifdef HAVE_AUTH
        struct auth_zone *zone;
  #endif
+@@ -2504,6 +2513,9 @@ void tcp_request(int confd, time_t now, struct iovec *bigbuff,
+ 	    ede = EDE_INVALID_DATA;
+ 	  else
+ 	    {
++#ifdef HAVE_UBUS
++	      safeshield_stats_record_query(&peer_addr);
++#endif
+ 	      do_bit = 0;
+ 	      
+ 	      if (find_pseudoheader(header, (size_t)size, NULL, &pheader, NULL, NULL))
+@@ -2596,7 +2608,13 @@ void tcp_request(int confd, time_t now, struct iovec *bigbuff,
+ 	  checking_disabled = header->hb4 & HB4_CD;
+ 	  
+ 	  if (lookup_domain(daemon->namebuff, gotname, &first, &last))
+-	    flags = is_local_answer(now, first, daemon->namebuff);
++	    {
++	      flags = is_local_answer(now, first, daemon->namebuff);
++#ifdef HAVE_UBUS
++	      if (flags && is_safeshield_block(first, last))
++		safeshield_stats_record_blocked(&peer_addr);
++#endif
++	    }
+ 	  else
+ 	    ede = EDE_NOT_READY;
+ 	  
 diff --git a/src/option.c b/src/option.c
+index 274732f..4b9d635 100644
 --- a/src/option.c
 +++ b/src/option.c
 @@ -201,6 +201,7 @@ struct myoption {
@@ -196,6 +270,7 @@ diff --git a/src/option.c b/src/option.c
  		
  		if (!lastdomain || cur_domain == lastdomain)
 diff --git a/src/ubus.c b/src/ubus.c
+index 424e98e..b879820 100644
 --- a/src/ubus.c
 +++ b/src/ubus.c
 @@ -23,9 +23,29 @@
@@ -247,7 +322,7 @@ diff --git a/src/ubus.c b/src/ubus.c
    if (!(ubus = ubus_connect(NULL)))
      return NULL;
  
-@@ -226,6 +251,147 @@ static int ubus_handle_metrics(struct ubus_context *ctx, struct ubus_object *obj
+@@ -226,6 +251,180 @@ static int ubus_handle_metrics(struct ubus_context *ctx, struct ubus_object *obj
    return UBUS_STATUS_OK;
  }
  
@@ -307,38 +382,71 @@ diff --git a/src/ubus.c b/src/ubus.c
 +  return stat;
 +}
 +
-+void safeshield_stats_record_query(const union mysockaddr *source)
++void safeshield_stats_apply_delta(const union mysockaddr *source, u64 queries, u64 blocked)
 +{
 +  struct safeshield_client_stat *stat;
 +
 +  if (safeshield_source_ignored(source))
 +    return;
 +
-+  safeshield_queries++;
++  safeshield_queries += queries;
++  safeshield_blocked += blocked;
++
 +  if (!(stat = safeshield_get_client(source)))
 +    {
-+      safeshield_untracked_queries++;
++      safeshield_untracked_queries += queries;
++      safeshield_untracked_blocked += blocked;
 +      return;
 +    }
 +
-+  stat->queries++;
++  stat->queries += queries;
++  stat->blocked += blocked;
++}
++
++static void safeshield_stats_send_delta(const union mysockaddr *source, u64 queries, u64 blocked)
++{
++  unsigned char op = PIPE_OP_SAFESHIELD_STATS;
++  struct safeshield_stats_delta delta;
++
++  memset(&delta, 0, sizeof(delta));
++  delta.source.sa.sa_family = source->sa.sa_family;
++
++  if (source->sa.sa_family == AF_INET)
++    delta.source.in.sin_addr = source->in.sin_addr;
++  else if (source->sa.sa_family == AF_INET6)
++    delta.source.in6.sin6_addr = source->in6.sin6_addr;
++  else
++    return;
++
++  delta.queries = queries;
++  delta.blocked = blocked;
++
++  read_write(daemon->pipe_to_parent, &op, sizeof(op), RW_WRITE);
++  read_write(daemon->pipe_to_parent, (unsigned char *)&delta, sizeof(delta), RW_WRITE);
++}
++
++static void safeshield_stats_record_delta(const union mysockaddr *source, u64 queries, u64 blocked)
++{
++  if (safeshield_source_ignored(source))
++    return;
++
++  if (daemon->pipe_to_parent != -1)
++    {
++      safeshield_stats_send_delta(source, queries, blocked);
++      return;
++    }
++
++  safeshield_stats_apply_delta(source, queries, blocked);
++}
++
++void safeshield_stats_record_query(const union mysockaddr *source)
++{
++  safeshield_stats_record_delta(source, 1, 0);
 +}
 +
 +void safeshield_stats_record_blocked(const union mysockaddr *source)
 +{
-+  struct safeshield_client_stat *stat;
-+
-+  if (safeshield_source_ignored(source))
-+    return;
-+
-+  safeshield_blocked++;
-+  if (!(stat = safeshield_get_client(source)))
-+    {
-+      safeshield_untracked_blocked++;
-+      return;
-+    }
-+
-+  stat->blocked++;
++  safeshield_stats_record_delta(source, 0, 1);
 +}
 +
 +static int ubus_handle_safeshield_stats(struct ubus_context *ctx, struct ubus_object *obj,
@@ -355,7 +463,7 @@ diff --git a/src/ubus.c b/src/ubus.c
 +  CHECK(blob_buf_init(&b, BLOBMSG_TYPE_TABLE));
 +  CHECK(blobmsg_add_u32(&b, "schema", 1));
 +  CHECK(blobmsg_add_string(&b, "instance_id", safeshield_instance_id));
-+  CHECK(blobmsg_add_string(&b, "transport_scope", "udp"));
++  CHECK(blobmsg_add_string(&b, "transport_scope", "udp+tcp"));
 +  CHECK(blobmsg_add_u32(&b, "client_capacity", SAFESHIELD_CLIENT_STATS_MAX));
 +  CHECK(blobmsg_add_u32(&b, "tracked_clients", safeshield_client_count));
 +  CHECK(blobmsg_add_u64(&b, "untracked_queries", safeshield_untracked_queries));
